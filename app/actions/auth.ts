@@ -14,6 +14,17 @@ function validatePassword(password: string): boolean {
   return password.length >= 6;
 }
 
+// Helper to check if error is a Next.js redirect error
+function isRedirectError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof error.digest === 'string' &&
+    error.digest.startsWith('NEXT_REDIRECT')
+  );
+}
+
 export async function signInWithEmail(
   email: string,
   password: string
@@ -50,6 +61,10 @@ export async function signInWithEmail(
     revalidatePath('/dashboard');
     redirect('/dashboard');
   } catch (error) {
+    // Re-throw redirect errors - they must propagate
+    if (isRedirectError(error)) {
+      throw error;
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unexpected error occurred',
@@ -118,6 +133,10 @@ export async function signOut(): Promise<ServerActionResponse> {
     revalidatePath('/');
     redirect('/login');
   } catch (error) {
+    // Re-throw redirect errors - they must propagate
+    if (isRedirectError(error)) {
+      throw error;
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unexpected error occurred',
@@ -127,6 +146,14 @@ export async function signOut(): Promise<ServerActionResponse> {
 
 // Form-compatible wrapper that returns void
 export async function signOutFormAction(): Promise<void> {
-  await signOut();
-  // redirect() throws, so this never returns
+  try {
+    await signOut();
+    // redirect() throws, so this never returns
+  } catch (error) {
+    // Re-throw redirect errors - they must propagate
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    throw error;
+  }
 }
